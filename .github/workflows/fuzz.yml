@@ -1,0 +1,59 @@
+name: Scheduled Fuzzing
+
+on:
+  schedule:
+    - cron: '0 4 * * 0'   # Every Sunday at 04:00 UTC
+  workflow_dispatch:
+
+jobs:
+  rust-fuzz:
+    name: Rust Fuzzing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust Nightly
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz
+
+      - name: Run Rust fuzz targets
+        continue-on-error: true
+        working-directory: rust
+        run: |
+          cargo +nightly fuzz run decode_raw -- -max_total_time=3600 -jobs=2 || true
+
+      - name: Upload Rust artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-fuzz-artifacts
+          path: rust/fuzz/artifacts/**
+          retention-days: 30
+
+  go-fuzz:
+    name: Go Fuzzing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Run Go fuzz targets
+        continue-on-error: true
+        working-directory: go
+        run: |
+          go test -fuzz=FuzzDecodeRaw -fuzztime=10m ./... || true
+          go test -fuzz=FuzzRoundtrip -fuzztime=10m ./... || true
+
+      - name: Upload Go artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-fuzz-artifacts
+          path: go/**
+          retention-days: 30

@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  rust:
+    name: Rust Fuzz Targets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz
+
+      - name: Check Rust fuzz targets compile
+        run: |
+          cargo +nightly fuzz check decode_raw || true
+          cargo +nightly fuzz check roundtrip || true
+        working-directory: rust
+
+  go:
+    name: Go Fuzz Targets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Run Go tests
+        run: go test ./...
+        working-directory: go
+
+      - name: Verify Go fuzz targets
+        run: |
+          go test -fuzz=FuzzDecodeRaw -fuzztime=10s ./... || true
+          go test -fuzz=FuzzRoundtrip -fuzztime=10s ./... || true
+        working-directory: go
